@@ -1,0 +1,387 @@
+---
+title: "Opgave 3 empirical hedging"
+author: "Frederik KÃ¸lby Christensen"
+output: html_document
+---
+#Bemaerk: Hvis nogle joins (eller ting der referer til noget, der er lavet af en join) ikke virker, skyldes det at dokumentet er koert en gang - ryd memory, og proev igen.
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r import data}
+#import data, (work from FinKont0 project last year)
+
+library(quantmod)
+
+yesterday <- "2022-05-05" #yyyy-mm-dd yesterday used so data is there, no matter the time of day.
+
+environment_sp500 <- new.env()
+suppressWarnings(getSymbols(c("^GSPC"), env = environment_sp500, src = "yahoo",from = as.Date("1990-01-02"),
+                            to = as.Date(yesterday)))
+
+sp500 <- environment_sp500$GSPC
+
+library(tidyverse)
+
+
+
+df_sp500 <- tibble(data.frame(date = index(sp500), coredata(sp500)))
+#end stuff from FinKont0 project
+library(patchwork)
+library(cowplot)
+library(eply)
+library(moments)
+
+```
+
+
+```{r datasetup}
+
+theme_set(theme_bw())
+set.seed(442)
+
+Vix <- read_csv("C:\\Users\\Frederik Christensen\\OneDrive\\UNI\\Mat-oek-tiden\\6Semester\\Vix.csv")
+
+
+Vix <- Vix %>% 
+  rename("AdjClose"="Adj Close") %>% 
+  mutate(AdjClose=(AdjClose/100))
+
+commonFinData <- df_sp500[,c("date", "GSPC.Adjusted")] %>% 
+  right_join(Vix[,c("Date", "AdjClose")], by=c("date"="Date")) %>% 
+  rename(c("SP500" = "GSPC.Adjusted", "VIX" ="AdjClose"))
+
+fullHistory <- df_sp500[,c("date", "GSPC.Adjusted")] %>% 
+  left_join(Vix[,c("Date", "AdjClose")], by=c("date"="Date"))%>% 
+  rename(c("SP500" = "GSPC.Adjusted", "VIX" ="AdjClose"))
+#Rename so names of vectors make more sense for the project
+
+
+
+
+```
+
+```{r plot function}
+#Plot things together:
+plotSP500andVix <- function(fullHis = FALSE, logar = FALSE){#crapfunction does not work due to tidyselect
+  if (fullHis) {
+    ds = fullHistory
+  }else{
+    ds = commonFinData
+  }
+  if (logar) {
+    func = log
+  } else {
+    func = NULL
+  }
+
+  
+  ds <- ds %>% mutate(across(.cols = c(SP500, VIX),.fns = func))
+  print(ds)
+  p1 <- ggplot(ds, aes(date, SP500)) + geom_line() + labs(x="")
+  p2 <- ggplot(ds, aes(date, VIX)) + geom_line() + labs(x="Dato")
+  plt <- plot_grid(p1, p2, ncol = 1)
+  return (plt)
+}
+plotSP500andVix(fullHis = FALSE, logar = FALSE)
+ggsave("SP500VIX.png", device ="png")
+```
+
+
+```{r estimationfunctions}
+simpleavg <- function(vec){
+  vecimin1 <- head(vec,-1)
+  vecii <- tail(vec,-1)
+  ri <- log(vecii)-log(vecimin1)
+  dt <- 1/252
+  n <- length(vec)
+  return (sqrt(((1/(n-1))*sum((ri-mean(ri))^2))/dt))
+}
+
+expavg <- function(vec, lambda){
+  vecimin1 <- head(vec,-1)
+  vecii <- tail(vec,-1)
+  ri <- log(vecii/vecimin1)
+  dt <- 1/252
+  normfact <- 0
+  avg <- 0
+  for (i in 1:length(ri)){
+    avg <- avg + ((ri[(length(ri)-i+1)]-mean(ri))^2/(dt))*lambda^(i-1)*(1-lambda)
+    normfact <- normfact + (lambda^(i-1))*(1-lambda)
+  }
+  return (sqrt(avg/normfact))
+}
+
+
+```
+
+
+```{r Vol estimater}
+sigmainf <- simpleavg(fullHistory$SP500)
+sigmaexp <- expavg(fullHistory$SP500, lambda = 0.94)
+
+
+sigmaExpFullRun <- rep(NA, length(fullHistory$SP500))
+#sigmaExpSeason<- rep(NA, length(fullHistory$SP500))
+#sigmaExp1Month <- rep(NA, length(fullHistory$SP500))
+
+for (i in 22:length(sigmaExpFullRun)){#
+  #varians beregnes foerst fra der er mindst 1 maaneds hel logafkast minus 1 dag -> 1 mds. kurser 
+  sigmaExpFullRun[i] <- expavg(fullHistory$SP500[1:i], lambda = 0.94)
+}
+```
+
+
+```{r Vol estimatplots}
+cmp <- tibble(date= fullHistory$date, VIX = fullHistory$VIX, sigmainf= sigmainf, sigmaExpFullRun = sigmaExpFullRun) %>% 
+  pivot_longer(cols = VIX:sigmaExpFullRun, names_to = "Voltype", values_to = "Vol")
+
+
+ggplot(cmp, aes(x=date, group = Voltype, colour= Voltype)) + geom_line(aes(y=Vol)) + 
+  scale_color_discrete(name = "Volatilitets estimator", labels = c("Loeb. eksp. gns.", "Sigma uendelig", "VIX")) + ylab("Volatilitet") + xlab("Dato")
+ggsave("volestimatorer.png", device = "png") 
+
+cmplast3y <- slice_tail(cmp,n=252*3*3) #if change to number of means, change this
+ggplot(cmplast3y, aes(x=date, group = Voltype, colour= Voltype)) + geom_line(aes(y=Vol)) + 
+  scale_color_discrete(name = "Volatilitets estimator", labels = c("Loeb. eksp. gns.", "Sigma uendelig", "VIX")) + ylab("Volatilitet") + xlab("Dato")
+ggsave("volestimatorer3y.png", device="png")
+mean(filter(cmplast3y,Voltype=="VIX")$Vol)/mean(filter(cmplast3y,Voltype=="sigmaExpFullRun")$Vol)
+```
+```{r splitting datasets}
+spltfullHis <- fullHistory %>% 
+  mutate(chunk = floor((as.numeric(row.names(fullHistory))-2)/21)+1)
+spltfullHis
+```
+
+```{r Hedge setup}
+BlackScholesFormula  <- function (spot,timetomat,strike,r, sigma, opttype=1, greektype=1)
+{ 
+#greektype 1 equals regular price, greektype 2 equals delta, opttype 1 is call, opttype 2 is digital.
+d1<-(log(spot/strike)+ ((r)+0.5*sigma^2)*timetomat)/(sigma*sqrt(timetomat))
+d2<-d1-sigma*sqrt(timetomat)
+
+if (opttype==1 && greektype==1) result<-spot*pnorm(d1)-strike*exp(-r*timetomat)*pnorm(d2)
+
+
+if (opttype==1 && greektype==2) result<-pnorm(d1)
+
+
+
+
+BlackScholesFormula<-result
+}
+
+
+Hedge <- function(r, mu, sigma, sigma_hedge, shouldprint, shouldplot, shouldsave, stock){
+  #stock is the stocks, the whole month, including the day before the month, (S_0)
+  S0<- stock[1]
+  sigma <- sigma_hedge[1]
+  strike <- S0
+  capT <- 1/12
+  Nhedge <- 21
+  dt<-capT/Nhedge
+  #initialoutlay<-BlackScholesFormula(S0,capT,strike, r,sigma_hedge,1,1)
+  initialoutlay<-BlackScholesFormula(S0,capT,strike, r,sigma,1,1) #vores indtÃ¦gt er at sÃ¦lge en option, vi antager markedet kan regne
+  Vpf<-rep(initialoutlay,1)
+  
+  a<-BlackScholesFormula(S0,capT,strike, r,sigma_hedge[1],1,2)
+  
+  b<-Vpf-a*S0
+  
+  for(i in 2:(Nhedge)){
+    St<-stock[i]
+    Vpf<-a*St+b*exp(dt*r)
+    #a<-BlackScholesFormula(St,(capT-(i-1)*dt),strike, r,sigma_hedge[i],1,2)
+    a<-BlackScholesFormula(St,(capT-(i-1)*dt),strike, r,sigma_hedge[1],1,2)
+    b<-Vpf-a*St
+  }
+
+  St<-stock[Nhedge+1]
+  Vpf<-a*St+b*exp(dt*r)
+
+  optionpayoff<-pmax(St-strike,0)
+  hedgeerror<-Vpf-optionpayoff
+  sdhedgeerror <- sd(hedgeerror)
+  hedgeDeviation <- (mean(Vpf)-mean(optionpayoff))/mean(optionpayoff)
+
+  
+  
+  if (shouldplot) {
+
+    
+    pltdf <- tibble(St, Vpf)
+    linedat <- tibble(xs = ((strike*0.75):(strike*1.25))/100, ys=pmax(((strike*0.75):(strike*1.25))/100 - strike,0))
+    g1 <- ggplot(pltdf, aes(x=St, y=Vpf)) + geom_point() + 
+      geom_line(data = linedat, aes(x=xs, y=ys, color="red"), show.legend = FALSE) +
+      labs(y="Vaerdi af portefoelje", x= "Aktiekurs, tid T")
+    print(g1)
+    if (shouldsave) {ggsave("Vpf.png", device="png")}
+
+  }
+  
+  
+  
+  if (shouldprint){
+    print(paste("Initial investment =",round(initialoutlay,4)))
+    print(paste("Average discounted option payoff =",round(exp(-r*capT)*mean(optionpayoff),4)))
+    print(paste("Average discounted portfolio value =",round(exp(-r*capT)*mean(Vpf),4)))
+    print(paste("Hedgeerror",round(mean(hedgeerror),6), "mu:", mu, "sigmahedge:" , sigma_hedge, "Nhedge: ", Nhedge))
+  }
+  return (c(hedgeerror/S0*100))
+}
+
+```
+
+```{r}
+i<- 22
+Hedge(0, 0, spltfullHis$VIX[(i*21+1)], c(rep(sigmainf,times=21)), shouldprint = FALSE, shouldplot = FALSE,shouldsave =  FALSE, spltfullHis$SP500[(i*21+1):(i*21+22)])
+```
+
+
+```{r Hedge setup}
+hedgedev <- tibble(deviation = rep(NA,times=(max(spltfullHis$chunk)-1)), chunk = rep(NA,times=(max(spltfullHis$chunk)-1))) 
+#should be %>% into something?
+
+
+for (i in (1:(max(spltfullHis$chunk)-1))){ #drop first chunk, as that will not have chunk sigma1mth
+  hedgedev$chunk[i] <- i+1
+  
+  hedgedev$deviation[i] <- Hedge(r=0, mu=0, sigma=spltfullHis$VIX[(i*21+1)], sigma_hedge=c(rep(sigmainf,times=21)), shouldprint = FALSE, shouldplot = FALSE,shouldsave =  FALSE, stock= spltfullHis$SP500[(i*21+1):(i*21+22)])
+}
+
+ggplot(data=hedgedev, aes(x=chunk, y=deviation)) + geom_point()
+spltfullHis <- mutate(spltfullHis, "SimGBM" = NA)
+
+spltfullHis$SimGBM[1]=spltfullHis$SP500[1]
+for (i in 2: nrow(spltfullHis)){
+  dtSim <- 1/252
+  Tsim <- nrow(spltfullHis)*dtSim
+  sigmaSim <- sigmainf
+  muSim <- log(spltfullHis$SP500[nrow(spltfullHis)]/spltfullHis$SP500[1])/Tsim + sigmaSim^2/2
+  spltfullHis$SimGBM[i] <- spltfullHis$SimGBM[i-1]*exp((muSim-0.5*sigmaSim^2)*dtSim +sigmaSim*sqrt(dtSim)*rnorm(n=1))	
+}
+
+for (i in 1:(max(spltfullHis$chunk)-1)){ #drop first chunk, as that will not have chunk sigma1mth
+    hedgedev$simDeviation[i] <- Hedge(r=0, mu=muSim,sigma=spltfullHis$VIX[(i*21+1)], sigma_hedge=rep(sigmaSim,times=21), shouldprint = FALSE, shouldplot = FALSE,shouldsave =  FALSE, stock = spltfullHis$SimGBM[(i*21+1):(i*21+22)])
+  # hedgedev$simDeviation[i] <- Hedge(0, muSim, sigmaSim, rep(sigmaSim,times=21), shouldprint = FALSE, shouldplot = FALSE,shouldsave =  FALSE, spltfullHis$SimGBM[(i*21+1):(i*21+22)])
+
+}
+
+deviationSplt <- left_join(x=spltfullHis, y=hedgedev,by="chunk") %>% 
+  mutate("deviationlag" = c(rep(NA,times=21),head(deviation,-21)), "SP500lag" = c(rep(NA,times=21),head(SP500,-21)), 
+         "simdeviationlag" = c(rep(NA,times=21),head(simDeviation,-21)), "runningExpAvg" = sigmaExpFullRun) %>% 
+  mutate("deviationlagDiff" = deviation-deviationlag, "SP500logreturns" = log(SP500/SP500lag), "simDeviationlagDiff" = simDeviation-simdeviationlag)
+qualdata <- tibble(simDeviation=unique(deviationSplt$simDeviation),deviation=unique(deviationSplt$deviation) ) %>% na.omit()
+```
+
+
+```{r Hedge plots}
+xlabs <- "Hedge-fejl (%)"
+(g2 <- ggplot(data=hedgedev, aes(x=deviation)) + geom_histogram(bins=80) + labs(x=xlabs,y="Antal") +xlim(-8,8) +ylim(0,100) + ggtitle("Sigma uendelig"))
+ggsave("HedgefejlHistsigmainf.png", device="png")
+
+(g2Sim <- ggplot(data=tibble(simDeviation=unique(deviationSplt$simDeviation)), aes(x=simDeviation))+ylim(0,100) + geom_histogram(bins=80) + labs(x=xlabs,y="Antal", caption = "Hedgingfejlene er målt som pct. af aktiekursen ultimo måneden før.")+xlim(-8,8) + ggtitle("Simuleret aktie"))
+
+(g1 <- ggplot(data= deviationSplt, aes(x=date,y=deviation)) + geom_line() + labs(x="Dato", y= xlabs) + ylim(-8,8)+ ggtitle("Sigma uendelig"))
+ggsave("HedgefejlTidsserieSigmainf.png", device="png")
+(g1Sim <- ggplot(data= deviationSplt, aes(x=date,y=simDeviation)) + geom_line() + labs(x="Dato", y= xlabs, caption = "Hedgingfejlene er målt som pct. af aktiekursen ultimo måneden før.")+ ylim(-8,8)+ ggtitle("Simuleret aktie"))
+
+ggplot(data= deviationSplt, aes(x=SP500logreturns)) + geom_histogram(bins=80) + labs(x="Log afkast, SP500", y= "Antal")
+ggsave("logafkastSP500.png", device=png)
+
+
+g1/g1Sim
+ggsave("HedgefejlSigmainfSimAndNoSimTimeSeries.png", device="png")
+g2/g2Sim
+ggsave("HedgefejlSigmainfSimAndNoSimHist.png", device="png")
+
+print(paste("mean: real", mean(qualdata$deviation), "simulated: ", mean(qualdata$simDeviation)))
+print(paste("Standarddev: real", sd(qualdata$deviation), "simulated: ", sd(qualdata$simDeviation)))
+print(paste("SKEWNESS: real", skewness(qualdata$deviation), "simulated: ", skewness(qualdata$simDeviation)))
+print(paste("KURTOSIS: real", kurtosis(qualdata$deviation), "simulated: ", kurtosis(qualdata$simDeviation)))
+```
+
+
+```{r other hedges}
+intermediatetibble <- tibble("chunk" = hedgedev$chunk)
+
+cheathedge <- function (r,mu,sigma, stock){
+  hedgedevfunc <- function(sigma_hedge, r, mu, sigma, stock){
+    
+    # print((Hedge(r=r, mu=mu , sigma=sigma, sigma_hedge=c(rep(sigma_hedge,times=21)), 
+    #       shouldprint = FALSE, shouldplot = FALSE, shouldsave = FALSE, stock = stock )^2))
+    
+    
+    return (Hedge(r=r, mu=mu , spltfullHis$VIX[(2*21+1)], c(rep(sigma_hedge,times=21)), 
+          shouldprint = FALSE, shouldplot = FALSE, shouldsave = FALSE, stock = stock ))
+    }
+  summingDeviation <- function(sigma_hedge, r, mu, sigma, stock){
+    devSum <- 0
+    for (i in (1:386)){
+      devSum <- hedgedevfunc(sigma_hedge, r, mu, sigma, stock[(i*21+1):(i*21+22)])^2
+    }
+    return (devSum)}
+  optimize(summingDeviation, c(10^-8,1), tol = 0.001, r=0, mu=0, sigma=sigma, stock=stock)
+}
+
+
+cheatVol <- cheathedge(r=0,mu=0, sigma=spltfullHis$VIX[(1*21+1)], stock = spltfullHis$SP500)$minimum
+```
+
+
+```{r other hedges}
+for (i in 1:nrow(hedgedev)){
+  
+  hedgedev$deviation[i] <- Hedge(r=0, mu=0, sigma=spltfullHis$VIX[(i*21+1)], sigma_hedge=c(rep(sigmainf,times=21)), shouldprint = FALSE, shouldplot = FALSE,shouldsave =  FALSE, stock= spltfullHis$SP500[(i*21+1):(i*21+22)])
+  
+  
+  
+intermediatetibble$expAvgDeviation[i] <- Hedge(r=0, mu = 0, sigma=deviationSplt$VIX[(i*21+1)], sigma_hedge =  deviationSplt$runningExpAvg[(i*21+1):(i*21+22)] , shouldprint = FALSE, shouldplot = FALSE,shouldsave =  FALSE, stock =  deviationSplt$SP500[(i*21+1):(i*21+22)])
+
+intermediatetibble$cheatVol[i] <-Hedge(r=0, mu = 0, sigma=deviationSplt$VIX[(i*21+1)], sigma_hedge =  c(rep(cheatVol, times=21)) , shouldprint = FALSE, shouldplot = FALSE,shouldsave =  FALSE, stock =  deviationSplt$SP500[(i*21+1):(i*21+22)])
+
+intermediatetibble$VIXdev[i] <- Hedge(r = 0, mu = 0, sigma = deviationSplt$VIX[(i*21+1)], sigma_hedge = deviationSplt$VIX[(i*21+1):(i*21+22)] , shouldprint = FALSE, shouldplot = FALSE,shouldsave =  FALSE, stock = deviationSplt$SP500[(i*21+1):(i*21+22)])
+}
+deviationSplt <- left_join(x = deviationSplt,y =  intermediatetibble, by = "chunk")
+```
+
+
+```{r other hedges}
+(gExpAvgDev <- ggplot(data= deviationSplt, aes(x=date,y=expAvgDeviation)) + geom_line() + labs(x="Dato", y= xlabs, caption = "Hedgingfejlene er målt som pct. af aktiekursen ultimo måneden før.") + ylim(-8,8) + ggtitle("Løbende eksponentielt gns."))
+(gVixDev <- ggplot(data= deviationSplt, aes(x=date,y=VIXdev)) + geom_line() + labs(x="Dato",y= xlabs) + ylim(-8,8)+ ggtitle("VIX"))
+(gCheatVol <- ggplot(data= deviationSplt, aes(x=date,y=cheatVol)) + geom_line() + labs(x="Dato", y= xlabs) + ylim(-8,8)+ ggtitle("Sigma min."))
+
+(gExpAvgDevHist <- ggplot(data=tibble(expAvgDeviation = unique(deviationSplt$expAvgDeviation)), aes(x=expAvgDeviation)) + geom_histogram(bins=80) + labs(x=xlabs,y="Antal", caption = "Hedgingfejlene er målt som pct. af aktiekursen ultimo måneden før.") + ggtitle("Løbende eksponentielt gns.") + xlim(-8,8)+ylim(0,100))
+(gVixDevHist <- ggplot(data=tibble(VIXdev = unique(deviationSplt$VIXdev)), aes(x=VIXdev)) + geom_histogram(bins=80) + labs(x=xlabs,y="Antal")+ ggtitle("VIX") + xlim(-8,8)+ylim(0,100))
+(gCheatVolHist <- ggplot(data=tibble(cheatVol = unique(deviationSplt$cheatVol)), aes(x=cheatVol)) + geom_histogram(bins=80) + labs(x=xlabs,y="Antal")+ ggtitle("Sigma min.") + xlim(-8,8)+ylim(0,100))
+
+
+
+(g2|gCheatVolHist)/(gVixDevHist|gExpAvgDevHist)
+ggsave("lastVolEstHistogram.png", device = "png")
+(g1|gCheatVol)/(gVixDev|gExpAvgDev)
+ggsave("lastVolEstTimeseries.png", device = "png")
+
+
+
+```
+
+
+```{r moments of new ests}
+qualdataNewEsts <- tibble(expAvg=unique(deviationSplt$expAvgDeviation),VixDev=unique(deviationSplt$VIXdev),   cheatVol=unique(deviationSplt$cheatVol) ) %>% na.omit()
+
+print(paste("mean: expAvg", mean(qualdataNewEsts$expAvg), "VixDev: ", 
+            mean(qualdataNewEsts$VixDev), "cheatVol: ", mean(qualdataNewEsts$cheatVol)))
+print(paste("Standarddev: expAvg", sd(qualdataNewEsts$expAvg), "VixDev: ", 
+            sd(qualdataNewEsts$VixDev), "cheatVol: ", sd(qualdataNewEsts$cheatVol)))
+print(paste("SKEWNESS: expAvg", skewness(qualdataNewEsts$expAvg), "VIXdev: ", 
+            skewness(qualdataNewEsts$VixDev), "cheatVol: ",
+            skewness(qualdataNewEsts$cheatVol)))
+print(paste("KURTOSIS: expAvg", kurtosis(qualdataNewEsts$expAvg), "VixDev: ", 
+            kurtosis(qualdataNewEsts$VixDev), "cheatVol: ",kurtosis(qualdataNewEsts$cheatVol)))
+```
+

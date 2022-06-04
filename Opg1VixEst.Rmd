@@ -1,0 +1,127 @@
+---
+title: "Opg1 VIX estimate"
+author: "Frederik Kølby Christensen"
+date: "27/5/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(matlib)
+library(numDeriv)
+library(patchwork)
+library(ggpubr)
+theme_set(theme_bw())
+```
+
+
+
+```{r params & data}
+set.seed(442)
+
+Vix <- read_csv("C:\\Users\\Frederik Christensen\\OneDrive\\UNI\\Mat-oek-tiden\\6Semester\\Vix.csv") %>% 
+  select(c(Date, "Adj Close")) %>% 
+  rename("Adj_Close" = "Adj Close") %>% 
+  #mutate(Adj_Close = Adj_Close/100) %>% 
+  mutate(LogClose = log(Adj_Close))
+
+N <- nrow(Vix)
+T <- nrow(Vix)/252
+dt <- T/N
+```
+
+
+```{r funcs}
+bMLE <- function(xi, ximin1, a){
+ mean(xi)-mean(ximin1)*a
+}
+
+aMLE <- function (xi,ximin1){ 
+  sum(ximin1*(xi-mean(xi)))/
+    sum(ximin1^2-ximin1*mean(ximin1))
+}
+
+vegaMLE <- function (xi, ximin1, a, b){
+  print(mean( (xi-a*ximin1-b)^2 ))
+  mean( (xi-a*ximin1-b)^2 )
+}
+
+MLEs <- function(xi, ximin1){
+  a <- aMLE(xi,ximin1)
+  b <- bMLE(xi, ximin1, a)
+  c(a, b, vegaMLE(xi, ximin1, a, b))
+}
+
+logL <- function(params,xii,ximin1) {
+  k <- params[1]
+  t <- params[2]
+  s <- params[3]
+  m = ximin1*exp(-k*dt)+t*(1-exp(-k*dt))
+  sd = sqrt(s^2*(1-exp(-2*k*dt))/(2*k))
+  sum(dnorm(xii, m, sd,log=TRUE))
+  #mean(dnorm(xii, m, sd,log=TRUE))
+}
+
+fromAlphaNumToGreeks <- function(aEmp, bEmp, vegaEmp){
+  #order is kappa, theta, sigma
+  res <- c(-log(aEmp)/dt, bEmp/(1-aEmp), sqrt((-2*log(aEmp)*vegaEmp)   /     (dt*(1-aEmp^2))   ))
+  return (res)
+}
+
+MLEsofVixVec <- function(vec){
+  Vixmin1 <- head(vec,-1)
+  Vixii <- tail(vec, -1)
+  
+  VIXMLEalph <- MLEs(Vixii, Vixmin1)
+  VIXMLEs <- fromAlphaNumToGreeks(VIXMLEalph[1],VIXMLEalph[2],VIXMLEalph[3])
+  VIXINFO <- -1*hessian(func = logL, x = VIXMLEs,xii = Vixii, ximin1 = Vixmin1)
+  VIXinvfish <- inv(VIXINFO)
+  
+  kint <- c(qnorm(0.025,VIXMLEs[1], sqrt(VIXinvfish[1,1])), qnorm(0.975,VIXMLEs[1], sqrt(VIXinvfish[1,1])) )
+  thtint <- c(qnorm(0.025,VIXMLEs[2], sqrt(VIXinvfish[2,2])), qnorm(0.975,VIXMLEs[2], sqrt(VIXinvfish[2,2])) )
+  sigint <- c(qnorm(0.025,VIXMLEs[3], sqrt(VIXinvfish[3,3])), qnorm(0.975,VIXMLEs[3], sqrt(VIXinvfish[3,3])) )
+  return (c(VIXMLEs,kint,thtint,sigint))
+}
+normalized <- function(k,t,s,vec){
+  vecimin1 <- head(vec,-1)
+  vecii <- tail(vec,-1)
+  mn <- vecimin1*exp(-k*dt)+t*(1-exp(-k*dt))
+  sd <- sqrt(s^2*(1-exp(-2*k*dt))/(2*k))
+  print(sd)
+  return ((vecii-mn)/sd)
+}
+  
+```
+
+
+```{r Plots}
+ggplot(Vix, aes(x=Date,y=Adj_Close)) + geom_line() + labs(y= "VIX", x="Dato")
+ggsave("Vixplt.png", device = "png")
+ggplot(Vix, aes(x=Date,y=LogClose)) + geom_line() + labs(y= "Log(VIX)", x="Dato") 
+
+
+(CloseMLE <- MLEsofVixVec(Vix$Adj_Close))
+(LogCloseMLE <- MLEsofVixVec(Vix$LogClose))
+
+
+CloseNorm <- normalized(CloseMLE[1], CloseMLE[2],CloseMLE[3],Vix$Adj_Close)  
+LogCloseNorm <- normalized(LogCloseMLE[1], LogCloseMLE[2],LogCloseMLE[3],Vix$LogClose) 
+#Vix$CloseNorm = CloseNorm
+
+VixCompare <- Vix %>% 
+  tail(-1) %>% 
+  mutate(CloseNorm=CloseNorm, LogCloseNorm = LogCloseNorm)
+VixRes <- VixCompare %>% 
+  mutate()
+
+g1 <- ggplot(VixCompare, aes(sample=CloseNorm))  + stat_qq() + geom_abline(slope=1, intercept=0,color="red") +
+  ggtitle("QQ-plot for VIX") + xlim(-4,4) + ylim(-10,16) + labs(x="Teoretiske fraktiler", y="Fraktiler for VIX")
+g2 <- ggplot(VixCompare, aes(sample=LogCloseNorm))  + stat_qq() + geom_abline(slope=1, intercept=0,color="red") + 
+  ggtitle("QQ-plot for log(VIX)") + xlim(-4,4) + ylim(-10,16) + labs(x="Teoretiske fraktiler", y="Fraktiler for log(VIX)")
+g1 + g2
+ggsave("QQplotVix.png", device="png")
+
+
+```
+

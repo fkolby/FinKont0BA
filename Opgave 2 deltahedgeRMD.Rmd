@@ -1,0 +1,261 @@
+---
+title: "Opgave2deltaHedge"
+author: "Frederik Kølby Christensen"
+date: "19/5/2022"
+output: html_document
+---
+#Setup
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(gridExtra)
+library(patchwork)
+theme_set(theme_bw())
+set.seed(442)
+
+Snul<-100
+
+r <- 0.02
+default_drift<-      0.02
+drift <- c(-100:100/1000)
+vol<-0.2
+vol_hedge <- c(2:300/1000)
+default_vol_hedge<-0.2
+cT<-1
+K<-102
+
+
+
+Nhedgetimes <- c(1:(252*8))# for graph
+#Nhedgetimes <- c(1:(252*2))# for graph
+#Nhedgetimes <- sapply(c(0:23),function(x) floor(2^x)) #table
+#Nhedgetimes <- 252
+default_Nhedgetimes <- 252
+Reps<-1000
+
+```
+#BlackScholes
+```{r BS}
+BlackScholesFormula  <- function (spot,timetomat,strike,r, sigma, opttype=1, greektype=1)
+{ 
+#greektype 1 equals regular price, greektype 2 equals delta, opttype 1 is call, opttype 2 is digital.
+d1<-(log(spot/strike)+ ((r)+0.5*sigma^2)*timetomat)/(sigma*sqrt(timetomat))
+d2<-d1-sigma*sqrt(timetomat)
+
+if (opttype==1 && greektype==1) result<-spot*pnorm(d1)-strike*exp(-r*timetomat)*pnorm(d2)
+
+if (opttype==2 && greektype==1) result<-exp(-r*timetomat)*(1-pnorm(d2))
+
+if (opttype==1 && greektype==2) result<-pnorm(d1)
+
+if (opttype==2 && greektype==2) result<-(-1)*exp(-r*timetomat)*dnorm(d2)/(spot*sigma*sqrt(timetomat))
+
+
+
+BlackScholesFormula<-result
+
+}
+```
+#Hedge function
+```{r Hedge function}
+# HEDGE
+# =====
+Hedge <- function(S0, r, mu, sigma, sigma_hedge, capT, strike, Nhedge, Nrep, shouldprint, shouldplot, shouldsave){
+  St<-rep(S0, length=Nrep)
+  dt<-capT/Nhedge
+  #initialoutlay<-BlackScholesFormula(S0,capT,strike, r,sigma_hedge,1,1)
+  initialoutlay<-BlackScholesFormula(S0,capT,strike, r,sigma_hedge,1,1) 
+  initialoutlayDigi <-BlackScholesFormula(S0,capT,strike, r,sigma_hedge,2,1)
+  
+  Vpf<-rep(initialoutlay,length=Nrep)
+  VpfDigi <- rep(initialoutlayDigi,length=Nrep)
+  
+  a<-BlackScholesFormula(St,capT,strike, r,sigma_hedge,1,2)
+  aDigi <- BlackScholesFormula(St,capT,strike, r,sigma_hedge,2,2)
+  
+  b<-Vpf-a*St
+  bDigi <- VpfDigi - aDigi*St
+  
+  for(i in 2:Nhedge){
+    St<-St*exp((mu-0.5*sigma^2)*dt +sigma*sqrt(dt)*rnorm(Nrep))	
+    Vpf<-a*St+b*exp(dt*r)    
+    VpfDigi <- aDigi*St+bDigi*exp(dt*r)
+    a<-BlackScholesFormula(St,(capT-(i-1)*dt),strike, r,sigma_hedge,1,2)
+    aDigi<-BlackScholesFormula(St,(capT-(i-1)*dt),strike, r,sigma_hedge,2,2)
+    b<-Vpf-a*St
+    bDigi <- VpfDigi-aDigi*St
+  }
+  
+  St<-St*exp((mu-0.5*sigma^2)*dt +sigma*sqrt(dt)*rnorm(Nrep))
+  Vpf<-a*St+b*exp(dt*r)
+  VpfDigi <- aDigi*St+bDigi*exp(dt*r)
+  optionpayoff<-pmax(St-strike,0)
+  optionpayoffDigi<-ifelse(St <= strike,1,0)
+  hedgeerror<-Vpf-optionpayoff
+  hedgeerrorDigi <- (VpfDigi-optionpayoffDigi)
+  sdhedgeerror <- sd(hedgeerror)
+  sdhedgeerrorDigi <- sd(hedgeerrorDigi)
+  hedgeDeviation <- (mean(Vpf)-mean(optionpayoff))/mean(optionpayoff)*100
+  hedgeDeviationDigi <- (mean(VpfDigi)-mean(optionpayoffDigi))/mean(optionpayoffDigi)*100
+  
+  if (shouldplot) {
+
+    
+    pltdf <- tibble(St, Vpf)
+    linedat <- tibble(xs = 5000:20000/100, ys=pmax(5000:20000/100 - strike,0))
+    g1 <- ggplot(pltdf, aes(x=St, y=Vpf)) + geom_point(alpha=0.1) + 
+      geom_line(data = linedat, aes(x=xs, y=ys, color="red"), show.legend = FALSE) +
+      labs(y="Værdi af portefølje", x= "Aktiekurs, tid T")
+    print(g1)
+    if (shouldsave) {ggsave("Vpf.png", device="png")}
+    
+    pltdf <- tibble(St, VpfDigi)
+    linedat <- tibble(xs = 5000:20000/100, ys=ifelse(5000:20000/100 <= strike,1,0)) 
+    g2 <- ggplot(pltdf, aes(x=St, y=VpfDigi)) + geom_point(alpha=0.1) + 
+      geom_line(data = linedat, aes(x=xs, y=ys, color="red"), show.legend = FALSE) + 
+      labs(y="", x = "Aktiekurs, tid T", caption = "Den røde streg angiver payoff-funktionerne for de to optioner. ")
+    print(g2)
+    if (shouldsave) {ggsave("Vpfdigi", device = "png")}
+    g3 <- g1+g2
+    print(g3)
+    (g3)
+    if (shouldsave){ggsave("hedges.png", device = "png")}
+  }
+  
+  
+  
+  if (shouldprint){
+    print(paste("Initial investment =",round(initialoutlay,4)))
+    print(paste("Average discounted option payoff =",round(exp(-r*capT)*mean(optionpayoff),4)))
+    print(paste("Average discounted portfolio value =",round(exp(-r*capT)*mean(Vpf),4)))
+    print(paste("Hedgeerror",round(mean(hedgeerror),6), "mu:", mu, "sigmahedge:" , sigma_hedge, "Nhedge: ", Nhedge))
+    print(paste("Hedgeerror, sd =",round(mean(sdhedgeerror),4),"mu:", mu, "sigmahedge:" , sigma_hedge, "Nhedge: ", Nhedge))
+  }
+  
+  
+  if (shouldprint){
+    print(paste("DigiInitial investment =",round(initialoutlayDigi,4)))
+    print(paste("DigiAverage discounted option payoff =",round(exp(-r*capT)*mean(optionpayoffDigi),4)))
+    print(paste("DigiAverage discounted portfolio value =",round(exp(-r*capT)*mean(VpfDigi),4)))
+    print(paste("DigiHedgeerror",round(mean(hedgeerrorDigi),6), "mu:", mu, "sigmahedge:" , sigma_hedge, "Nhedge: ", Nhedge))
+    print(paste("DigiHedgeerror, sd =",round(mean(sdhedgeerrorDigi),4), "mu:", mu, "sigmahedge:" , sigma_hedge, "Nhedge: ", Nhedge))
+  }
+  return (c(mean(hedgeerror),sdhedgeerror,mean(hedgeerrorDigi),sdhedgeerrorDigi, hedgeDeviation, hedgeDeviationDigi))
+}
+```
+
+
+```{r delta function}
+sigmatest <- vol
+testspot <- 102
+testtimetomat <- 1/(252*8*6)
+timetomatplt <- ggplot() + xlim(50,200) + geom_function(size=1, n=1000, aes(color = "Call", linetype = "10 min."), fun = function(x) (BlackScholesFormula(spot=x, timetomat = testtimetomat, strike = 102, r = r, sigma = sigmatest, opttype=1, greektype = 2))) +
+  geom_function(size=1, n=1000, aes(color = "Call", linetype = "1 dag"), fun = function(x) (BlackScholesFormula(spot=x, timetomat = 1/252, strike = 102, r = r, sigma = sigmatest, opttype=1, greektype = 2))) +
+  geom_function(size=1, n=1000,aes(color = "Digital", linetype = "10 min."), fun = function(x) BlackScholesFormula(spot=x, timetomat = testtimetomat, strike = 102, r = r, sigma = sigmatest, opttype=2, greektype = 2)) + 
+  geom_function(size=1, n=1000,aes(color = "Digital", linetype = "1 dag"), fun = function(x) BlackScholesFormula(spot=x, timetomat = 1/252, strike = 102, r = r, sigma = sigmatest, opttype=2, greektype = 2)) + 
+  labs(x="S", y="Delta",caption = "") + scale_color_discrete(name="Optionstype") + scale_linetype_manual(name = "Resterende løbetid", values = c("solid", "dotted"))
+
+
+
+
+
+volVpfPlt <- ggplot() + xlim(0.1,0.3) + geom_function(size=1, n=1000, aes(color = "Call"), fun = function(x) (BlackScholesFormula(spot=testspot, timetomat = 0.2, strike = 102, r = r, sigma = x, opttype=1, greektype = 1)/BlackScholesFormula(spot=testspot, timetomat = 0.2, strike = 102, r = r, sigma = 0.2, opttype=1, greektype = 1))) +
+  geom_function(size=1, n=1000,aes(color = "Digital"), fun = function(x) BlackScholesFormula(spot=testspot, timetomat = 0.2, strike = 102, r = r, sigma = x, opttype=2, greektype = 1)/BlackScholesFormula(spot=testspot, timetomat = 0.2, strike = 102, r = r, sigma = 0.2, opttype=2, greektype = 1)) + 
+  labs(x="Volatilitet", y="Værdi af option",caption = "") + scale_color_discrete(name="Optionstype")
+
+volVpfPlt
+timetomatplt
+
+
+ggsave("deltaplotDigiOgCall.png", device = "png")
+```
+#Summary and summary graps
+```{r Summary and summary graphs}
+driftdata <- matrix(data=NA, ncol=3, nrow=length(drift))
+i=1
+sta = 0
+Basecase <- Hedge(Snul,  r, default_drift, vol, default_vol_hedge, cT, K, default_Nhedgetimes, Reps, shouldprint = TRUE, shouldplot = TRUE,shouldsave=TRUE)
+
+```
+##Details
+```{r Detailed graph data}
+for (item in drift){
+  if (i%%100==0){
+    print(paste("Got to mu=", item, ", Time elapsed: ", (proc.time()-sta)[3]))
+    sta <- proc.time()
+  }
+  
+  output <- Hedge(Snul,  r, item, vol, default_vol_hedge, cT, K, default_Nhedgetimes, Reps, shouldprint = FALSE, shouldplot = FALSE,shouldsave=FALSE)
+  driftdata[i,1] <- item
+  driftdata[i,2] <- output[5]
+  driftdata[i,3] <- output[6]
+  i<- i+1
+  
+}
+
+
+i=1
+vols <- matrix(data=NA, ncol=4, nrow=length(vol_hedge))
+for (item in vol_hedge){
+  if (i%%100 == 0) {
+    print(paste("Got to vol_hedge=", item, ", Time elapsed: ", (proc.time()-sta)[3]))
+    sta <- proc.time()
+  }
+  output <- Hedge(Snul, r, default_drift, vol, item, cT, K, default_Nhedgetimes, Reps, shouldprint = FALSE, shouldplot = FALSE,shouldsave=FALSE)
+  output2 <- Hedge(Snul, r, default_drift, vol, item, cT, K, 4*default_Nhedgetimes, Reps, shouldprint = FALSE, shouldplot = FALSE,shouldsave=FALSE)
+  vols[i,1] <- item
+  vols[i,2] <- output[5]
+  vols[i,3] <- output[6]
+  vols[i,4] <- output2[5]
+  i<- i+1
+
+}
+
+
+
+i=1
+nhedges <- matrix(data=NA, ncol=3, nrow=length(Nhedgetimes))
+for (item in Nhedgetimes){
+  if (i%%50 == 0){
+  print(paste("Got to Nhedgetime=", item,"(iteration ",i, "of", length(Nhedgetimes), "), Time elapsed: ", (proc.time()-sta)[3]))
+  sta <- proc.time()}
+  output <- Hedge(Snul, r, default_drift, vol, default_vol_hedge, cT, K, item, Reps, shouldprint = FALSE, shouldplot = FALSE,shouldsave=FALSE)
+  nhedges[i,1]<- item
+  nhedges[i,2]  <- output[2]
+  nhedges[i,3]  <- output[4]
+
+  i<- i+1
+}
+
+
+
+```
+##Detailed graphs
+```{r Graphing the data}
+
+
+rdata <- tibble("Drift" =  driftdata[,1], "HedgeerrorsCall" = driftdata[,2],"HedgeerrorsDigi" = driftdata[,3])  %>% 
+  pivot_longer(cols = "HedgeerrorsCall":"HedgeerrorsDigi", names_to = "Optiontype", names_prefix = "Hedgerrors", values_to = "Hedgeerror")
+
+ggplot(data = rdata, aes(x=Drift, y=Hedgeerror, colour = Optiontype)) + geom_point() + 
+  labs(x="Aktiens drift", y= "Afvigelse fra optionspayoff, pct.", colour = "Optionstype")+
+  scale_colour_discrete(name="Optionstype", labels=c("Call", "Digital"))
+ggsave("rIkkeLigMu.png",device="png")
+
+voldata <- tibble("Vol_hedge" =  vols[,1], "HedgeerrorsCall" = vols[,2],"HedgeerrorsDigi" = vols[,3])%>% 
+  pivot_longer(cols = "HedgeerrorsCall":"HedgeerrorsDigi", names_to = "Optiontype", names_prefix = "Hedgerrors", values_to = "Hedgeerror")
+
+ggplot(data = voldata, aes(x=Vol_hedge)) + geom_point(aes(y=Hedgeerror, color = Optiontype)) +
+  labs(x="Antaget volatilitet i hedgestrategi", y= "Afvigelse fra optionspayoff, pct.", colour = "Optionstype") +
+  scale_colour_discrete(name="Optionstype", labels=c("Call", "Digital"))
+ggsave("volHedge.png",device="png")
+
+
+hedgedata <- tibble("NumHedgepoints" =  nhedges[,1], "SDHedgeerrorsCall" = nhedges[,2],"SDHedgeerrorsDigi" = nhedges[,3])%>% 
+  pivot_longer(cols = "SDHedgeerrorsCall":"SDHedgeerrorsDigi", names_to = "Optiontype", names_prefix = "SDHedgerrors", values_to = "SDHedgeerror")
+
+ggplot(data = hedgedata, aes(x=log(NumHedgepoints))) + geom_point(aes(y=log(SDHedgeerror), color = Optiontype)) +
+  labs(x="Log(antal hedgingpunkter)", y= "Log(SD. afv. på absolut hedgefejl)", colour = "Optionstype") + 
+  scale_colour_discrete(name="Optionstype", labels=c("Call", "Digital"))
+ggsave("nHedge.png",device="png")
+```

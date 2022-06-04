@@ -1,0 +1,219 @@
+---
+title: "Opgave 1"
+author: "Frederik KÃ¸lby Christensen"
+date: "26/4/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(matlib)
+library(numDeriv)
+library(ggpubr)
+theme_set(theme_bw())
+```
+
+
+```{r variables}
+set.seed(442)
+savegraph = FALSE
+Mreps <- 10000
+kappa <- 0.5
+theta <- 0.05
+sigma <- 0.02
+N <- 1000
+T <- 1
+dt <- T/N
+
+X0 <- 0.01
+a <- exp(-kappa*dt)
+b <- theta*(-1*expm1(-kappa*dt))
+vega <- sigma^2*(1-exp(-2*kappa*dt))/(2*kappa)
+  
+
+
+logL <- function(params,xii,ximin1) {
+  k <- params[1]
+  t <- params[2]
+  s <- params[3]
+  m = ximin1*exp(-k*dt)+t*(1-exp(-k*dt))
+  sd = sqrt(s^2*(1-exp(-2*k*dt))/(2*k))
+  sum(dnorm(xii, m, sd,log=TRUE))
+  #mean(dnorm(xii, m, sd,log=TRUE))
+}
+
+
+fromAlphaNumToGreeks <- function(aEmp, bEmp, vegaEmp){
+  #order is kappa, theta, sigma
+  res <- c(-log(aEmp)/dt, bEmp/(1-aEmp), sqrt((-2*log(aEmp)*vegaEmp)   /     (dt*(1-aEmp^2))   )) #/ (dt*(1-aEmp^2))   ))
+  return (res)
+}
+
+
+meanNorm <- function(xiMinusOne){
+  a <- exp(-kappa*dt)
+  b <- theta*(-1*expm1(-kappa*dt))
+  vega <- sigma^2*(1-exp(-2*kappa*dt))/(2*kappa)
+  return (xiMinusOne*a+b)
+}
+sdNorm <- sqrt(vega)
+
+
+
+ximin1 <- function(xs, xnul = X0) {
+  head(c(xnul,xs), -1)}
+# 
+#  bMLE <- function (xi,ximin1){
+#    (sum(ximin1^2)*sum(xi)-sum(ximin1)*sum(xi*ximin1)  )/
+#      (N*sum(ximin1^2)+sum(ximin1)^2)
+# }
+bMLE <- function(xi, ximin1, a){
+ mean(xi)-mean(ximin1)*a
+}
+
+aMLE <- function (xi,ximin1){ 
+  sum(ximin1*(xi-mean(xi)))/
+    sum(ximin1^2-ximin1*mean(ximin1))
+}
+
+vegaMLE <- function (xi, ximin1, a, b){
+  sum( (xi-a*ximin1-b)^2 )/N
+}
+
+MLEs <- function(xi, ximin1){
+  a <- aMLE(xi,ximin1)
+  b <- bMLE(xi, ximin1, a)
+  c(a, b, vegaMLE(xi, ximin1, a, b))
+}
+```
+
+```{r DGP}
+X1 <- rnorm(Mreps, mean = meanNorm(X0),sd = sdNorm)
+simMat <- matrix(data = X1, byrow = TRUE, ncol = Mreps, nrow = N)
+for (i in 2:N) {
+  simMat[i,] <- rnorm(Mreps, mean = meanNorm(simMat[i-1,]),sd = sdNorm)
+  
+}
+#mean(simMat[N]-theta)
+MLEalphas <- matrix(data = NA,nrow = Mreps, ncol = 3)
+MLEGreeks <- matrix(data = NA,nrow = Mreps, ncol = 3)
+Information <- matrix(data = NA, nrow = Mreps, ncol = 9)
+for (i in 1: Mreps){
+  MLEalphas[i,] <- MLEs(simMat[,i], ximin1(simMat[,i]))
+  MLEGreeks[i,] <- fromAlphaNumToGreeks(MLEalphas[i,1],MLEalphas[i,2],MLEalphas[i,3])
+  Information[i,] <- matrix(data=hessian(func = logL, x = MLEGreeks[i,],xii = simMat[,i],ximin1 = ximin1(simMat[,i])), ncol = 9)
+  #
+} 
+
+
+#drop estimates with problems 
+df <- cbind(MLEalphas,MLEGreeks,Information)
+df <- na.omit(df)
+MLEalphas <- df[,1:3]
+MLEGreeks <- df[,4:6]
+MLEInformation <- df[,7:15]
+
+
+
+
+infohat <- matrix(data = NA, nrow = nrow(Information), ncol = 9)
+insideint <- matrix(data=NA, nrow = nrow(Information), ncol = 3)
+
+for (m in 1:(nrow(MLEInformation))){
+  infohat <- (-1)*MLEInformation
+  kaphat <- MLEGreeks[m,1]
+  ththat <- MLEGreeks[m,2]
+  sighat <- MLEGreeks[m,3]
+  infohat<-matrix(infohat[m,], nrow = 3, ncol = 3)
+  invfish <- inv(infohat)
+  kint <- c(qnorm(0.025,kaphat, sqrt(invfish[1,1])), qnorm(0.975,kaphat, sqrt(invfish[1,1])) )
+  thtint <- c(qnorm(0.025,ththat, sqrt(invfish[2,2])), qnorm(0.975,ththat, sqrt(invfish[2,2])) )
+  sigint <- c(qnorm(0.025,sighat, sqrt(invfish[3,3])), qnorm(0.975,sighat, sqrt(invfish[3,3])) )
+  
+  insideint[m,1] <- ((kappa >= kint[1]) & (kappa <= kint[2]))
+  insideint[m,2] <- (theta >= thtint[1]) & (theta <= thtint[2])
+  insideint[m,3] <- (sigma >= sigint[1]) & (sigma <= sigint[2])
+}
+insideint <- na.omit(insideint)
+print(paste("kappa:", mean(insideint[,1]), ", theta:", mean(insideint[,2]), ", sigma:", mean(insideint[,3])))
+```
+
+
+```{r MLES}
+ahat <- mean(MLEalphas[,1])
+bhat <- mean(MLEalphas[,2])
+vhat <- mean(MLEalphas[,3])
+kappahats <- (MLEGreeks[,1])
+thetahats <- (MLEGreeks[,2])
+sigmahats <- (MLEGreeks[,3])
+
+
+
+
+kappahat <- mean(kappahats)
+thetahat <- mean(thetahats)
+sigmahat <- mean(sigmahats)
+
+GreekHatvec <- c(kappahat,thetahat,sigmahat)
+# WaldEst <- function(k,t,s,ktshatvec,ifish){
+#   ktsvec<- c(k,t,s)
+#   (t(ktsvec-ktshatvec))%*%ifish%*%(ktsvec-ktshatvec)
+# }
+
+
+
+#antal obs? n eller nplusen?
+infohat <- matrix(data = NA, nrow = 1, ncol = 9)
+for (i in 1:9){infohat[,i]=mean(MLEInformation[,i])}
+infohat <- (-1)*matrix(data=infohat, nrow = 3, ncol = 3)
+
+(inversefisher <- inv(infohat))
+
+
+#WaldReg <- n*t()
+sprintf("%.6f",var(MLEGreeks))
+sprintf("%.6f",inversefisher)
+
+print(paste("sd, kappahat", sd(kappahats), "sdfisher", sqrt(inversefisher[1,1])))
+print(paste("sd, thetahat", sd(thetahats), "sdfisher", sqrt(inversefisher[2,2])))
+print(paste("sd, sigmahat", sd(sigmahats), "sdfisher", sqrt(inversefisher[3,3])))
+
+
+
+```
+
+```{r Visualizations}
+paramDF <- tibble("Kappa estimates"=kappahats,"Theta estimates"=thetahats, "Sigma estimates"=sigmahats)
+scalefun <- function(x) {sprintf("%.3f", x)}
+scalefunth <- function(x) {sprintf("%.3f", x)}
+kaplt <- ggplot(paramDF, aes(x=kappahats)) +
+  geom_histogram(aes(x=kappahats,y=..density..), bins=50) + xlim(-5,30) +
+  geom_vline(xintercept = kappa, color="red") + 
+  geom_vline(xintercept = kappahat, color="black", linetype="dashed") +
+  labs(y="Tæthed", x="Kappa est.")+
+  stat_function(fun=dnorm, args = list(mean=kappahat, sd=sqrt(inversefisher[1,1])))
+thplt <- ggplot(paramDF, aes(x=thetahats)) + 
+  scale_x_continuous(labels=scalefunth, limits = c(-0.05,0.1)) +
+  geom_histogram(aes(x=thetahats,y = ..density..), bins=50) + 
+  geom_vline(xintercept = theta, color="red") +
+  geom_vline(xintercept = thetahat, color="black", linetype="dashed") + 
+  labs(y="Tæthed", x="Theta est.")+
+  stat_function(fun=dnorm, args = list(mean=thetahat, sd=sqrt(inversefisher[2,2])))
+shplt <- ggplot(paramDF, aes(x=sigmahats)) + 
+  geom_histogram(aes(x=sigmahats, y=..density..), bins=50)  +
+  scale_x_continuous(labels=scalefun, limits = c(0.015,0.025)) +
+  labs(y="Tæthed", x="Sigma est.")+
+  geom_vline(xintercept = sigma, color="red") + 
+  geom_vline(xintercept = sigmahat, color="black", linetype="dashed") + 
+  stat_function(fun=dnorm, args = list(mean=sigmahat, sd=sqrt(inversefisher[3,3])))
+ggarrange(kaplt, thplt, shplt,labels = c("A","B","C"), ncol=3)
+if (savegraph){ggsave(paste("Opg1SimT",T,".png"),device="png")}
+
+```
+```{r VIX}
+
+
+```
+
+

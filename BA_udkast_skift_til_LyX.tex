@@ -1,0 +1,347 @@
+%% LyX 2.3.6.1 created this file.  For more info, see http://www.lyx.org/.
+%% Do not edit unless you really know what you are doing.
+\documentclass[12pt,danish,titlepage]{article}
+\usepackage[utf8]{luainputenc}
+\usepackage[a4paper]{geometry}
+\geometry{verbose,tmargin=2.54cm,bmargin=2.54cm,lmargin=2.1cm,rmargin=2.54cm}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\setlength{\parindent}{4em}
+\usepackage{babel}
+\usepackage{mathtools}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage[unicode=true,
+ bookmarks=false,
+ breaklinks=false,pdfborder={0 0 1},backref=section,colorlinks=false]
+ {hyperref}
+
+\makeatletter
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% User specified LaTeX commands.
+\usepackage[table,xcdraw]{xcolor}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{amsfonts}
+\usepackage{booktabs}
+\usepackage{wrapfig}
+\usepackage{caption}
+\usepackage[export]{adjustbox}
+\usepackage{pdfpages}
+\usepackage{fancyhdr}
+\usepackage{parskip}
+\usepackage{lastpage}
+\usepackage{listings}
+\usepackage{multirow}
+\usepackage{xifthen}
+\usepackage[english,danish]{babel}
+\usepackage{amsthm}
+\usepackage{mathrsfs}
+\usepackage{csquotes}
+\usepackage{cleveref}
+\graphicspath{ {./images/} }
+
+\pagenumbering{arabic}
+
+
+
+
+
+
+\def\ \fag{BA}
+\def\ \navn{Juni 2022}
+\def\ \uni{Københavns Universitet}
+
+\title{\Huge BA}
+\author{ \fag \\  \navn \\ \uni}
+\date{10. 06. 2022}
+
+
+
+\fancyhf{}
+\rfoot{\thepage}
+\lhead{\tiny \navn}
+\rhead{\tiny \fag~-~\uni}
+%vigtige mængder
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\B}{\mathbb{B}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\Qx}{\mathbb{Q}^{\times}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\Cx}{\mathbb{C}^{\times}}
+\newcommand{\F}{\mathbb{F}}
+\newcommand{\G}{\mathscr{G}}
+\newcommand{\J}{\mathbb{J}}
+\newcommand{\ind}{\perp\!\!\!\!\perp} 
+\newcommand{\superset}{\supset}
+\newcommand{\dfdx}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\doubledfdx}[3]{\frac{\partial #1}{\partial #2\partial #3}}
+\newcommand{\parent}[1]{\left(#1\right )}
+\newcommand{\cparent}[1]{\left\{#1\right\} }
+\newcommand{\bparent}[1]{\left[]#1\right] }
+\newcommand{\ka}{\kappa}
+\def\equationautorefname~#1\null{ligning (#1)\null}
+\newcommand{\tht}{\theta}
+\newcommand{\si}{\sigma}
+\newcommand{\sumn}{\sum_{i=1}^n}
+\newcommand{\ximinen}{x_{i-1}}
+\newcommand{\xii}{x_i}
+\newcommand{\infint}[1]{\int_{#1}^{\infty}}
+\numberwithin{equation}{section}
+\setcounter{section}{0}
+
+%phi og epsilon
+\let\oldepsilon\epsilon
+\let\epsilon\varepsilon
+\let\varepsilon\epsilon
+\let\eps\epsilon
+
+\let\oldphi\phi
+\let\phi\varphi
+\let\varphi\phi
+
+%absolutvrdi og normer
+\DeclarePairedDelimiter{\abs}{\lvert}{\rvert} %dvs. du skal skrive \abs{...}, hvis du vil lave absolutvrdi
+\DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
+
+\let\oldabs\abs
+\def\abs{\@ifstar{\oldabs}{\oldabs*}}
+%
+\let\oldnorm\norm
+\def\norm{\@ifstar{\oldnorm}{\oldnorm*}}
+
+
+%layoutkommandoer
+\newcommand{\hs}{\hspace{4 pt}}
+
+
+\renewcommand{\baselinestretch}{1.5}
+
+
+
+\makeatother
+
+\usepackage[style=alphabetic,backend=biber,sorting=ynt]{biblatex}
+\addbibresource{Referencer.bib}
+\begin{document}
+\vspace{1mm}
+ Note: Check overfull textboxes! 
+
+\section{Empirical analysis of a linear SDE}
+
+\subsection{Vis en normalfordeling}
+
+Betragt Vasicek-modellen \cite{vasicek}, hvor aktivets kurs er givet
+ved følgende stokastiske differential ligning: 
+\begin{align}
+dX_{t}=\kappa(\theta-X_{t})dt+\sigma dW_{t}
+\end{align}
+Denne har en løsning, thi den er en sum af en ordinær differentialligning,
+$dX_{t}=\kappa\theta dt$, og så den geometriske brownske bevægelse,
+$dX_{t}=-\kappa X_{t}dt+\sigma dW_{t}$, der jf. \cite{bjork}, prop.
+5.2 har løsningen $X_{t}=X_{0}\exp\left\{ (-\kappa-\frac{\sigma^{2}}{2})t+\sigma W_{t}\right\} $.
+Det giver således mening at betragte $Z_{t}=e^{\kappa t}X_{t}$, som
+har følgende afledte: 
+\begin{align*}
+\frac{\partial z}{\partial t} & =\kappa e^{\kappa t}x\\
+\frac{\partial z}{\partial x} & =e^{\kappa t}\\
+\frac{\partial^{2}z}{\partial x^{2}} & =0
+\end{align*}
+Hvormed den har Itô-differentialet: 
+\begin{equation}
+dZ_{t}=\left\{ \kappa e^{\kappa t}X_{t}+\kappa\left(\theta-X_{t}\right)e^{\kappa t}\right\} dt+\sigma e^{\kappa t}dW_{t}=\kappa\theta e^{\kappa t}dt+\sigma e^{\kappa t}dW_{t}\label{itoz}
+\end{equation}
+Ovenstående gælder for alle t, specielt tidspunkt t+u. Integreres
+\autoref{itoz}, med hensyn til informationen på tidspunkt t, kan
+vi udtrykke $Z_{t+u}$ som: 
+\begin{align*}
+Z_{t+u}|\mathbb{F}_{t} & =Z_{t}+\int_{t}^{t+u}\kappa\theta e^{\kappa s}ds+\int_{t}^{t+u}\sigma e^{\kappa s}dW_{s}
+\end{align*}
+Andet led er givet ved: 
+\[
+\int_{t}^{t+u}\kappa\theta e^{\kappa s}ds=\theta e^{\kappa(t+u)}\left(1-e^{-\kappa u}\right)
+\]
+Af \cite{bjork}, lemma 4.18, vides det at sidste led fordelt som
+\[
+\mathcal{N}\left(0,\int_{t}^{t+u}\left(\sigma e^{\kappa s}\right){}^{2}ds\right)=\mathcal{N}\left(0,\left[\frac{1}{2\kappa}\sigma^{2}e^{2\kappa s}\right]_{t}^{t+u}\right)=\mathcal{N}\left(0,\frac{\sigma^{2}e^{2\kappa(t+u)}\left(1-e^{-2\kappa u}\right)}{2\kappa}\right)
+\]
+Alt i alt, gælder der således at 
+\begin{align*}
+Z_{t+u}|\mathbb{F}_{t}\sim\mathcal{N}\left(Z_{t}+\theta e^{\kappa(t+u)}\left(1-e^{-\kappa u}\right),\frac{\sigma^{2}e^{2\kappa(t+u)}\left(1-e^{-2\kappa u}\right)}{2\kappa}\right)\Rightarrow
+\end{align*}
+\begin{equation}
+X_{t+u}|\mathbb{F}_{t}=e^{-\kappa(t+u)}Z_{t+u}|\mathbb{F}_{t}\sim\mathcal{N}\left(X_{t}e^{-\kappa u}+\theta\left(1-e^{-\kappa u}\right),\frac{\sigma^{2}\left(1-e^{-2\kappa u}\right)}{2\kappa}\right)\label{xtfordeling}
+\end{equation}
+
+
+\subsection{MLE estimater}
+
+Det er almindeligt kendt at Maximum Likelihood estimater oftest er
+de "bedste", når man ønsker at bestemme parametre i en fordeling.
+Til dette formål, tages der udgangspunkt i den likelihood funktion,
+tilhørende \autoref{xtfordeling}, givet per \cite{opgave}, hvor
+det specielt bemærkes at $\Delta t$ er holdt konstant. Ud fra denne
+konstrueres følgende log-likelihood funktion, for n+1 (indeks 0 til
+n) observationer: 
+\begin{equation}
+LogL\left(a,b,v\right)=\sum_{i=1}^{n}-\log\left(\sqrt{2\pi}\right)-\log\left(\sqrt{v}\right)-\frac{\left(x_{i}-x_{i-1}a-b\right)^{2}}{2v}\label{loglike}
+\end{equation}
+Hvor der er foretaget følgende parameterskift, $\gamma\left(\kappa,\theta,\sigma\right)$:
+\begin{equation}
+\begin{pmatrix}a\\
+b\\
+c
+\end{pmatrix}=\gamma\begin{pmatrix}\kappa\\
+\theta\\
+\sigma
+\end{pmatrix}=\begin{pmatrix}e^{-\kappa\Delta t}\\
+\theta\left(1-e^{-\kappa\Delta t}\right)\\
+\frac{\sigma^{2}\left(1-e^{-2\kappa\Delta t}\right)}{2\kappa}
+\end{pmatrix}\Leftrightarrow\begin{pmatrix}\kappa\\
+\theta\\
+\sigma
+\end{pmatrix}=\gamma^{-1}\begin{pmatrix}a\\
+b\\
+c
+\end{pmatrix}=\begin{pmatrix}\frac{-\log(a)}{\Delta t}\\
+\frac{b}{1-a}\\
+\sqrt{-\frac{2\log(a)v}{\Delta t\left(1-a^{2}\right)}}
+\end{pmatrix}\label{parameterskift}
+\end{equation}
+For at lave parameterskiftet, er oplagt påkrævet at $\Delta t$ er
+konstant, ellers ville eksempelvis hver $\kappa$ være et $\kappa_{i}$,
+hvad der ikke ville hjælpe maksimum likelihood estimationen. Det ses
+af \cref{loglike} har følgende førstegrads afledte: 
+\begin{align}
+\frac{\partial LogL}{\partial a} & =\sum_{i=1}^{n}\frac{-2\left(x_{i}-x_{i-1}a-b\right)\left(-x_{i-1}\right)}{2v}\label{dLda}\\
+\frac{\partial LogL}{\partial b} & =\sum_{i=1}^{n}\frac{-2\left(x_{i}-x_{i-1}a-b\right)\left(-1\right)}{2v}\label{dLdb}\\
+\frac{\partial LogL}{\partial v} & =\sum_{i=1}^{n}-\frac{1}{2v}+\frac{\left(x_{i}-x_{i-1}a-b\right){}^{2}}{2v^{2}}\label{dLdc}
+\end{align}
+NOTE: Overvej at slette dette afsnit? Først betragtes \cref{dLdb},
+$\frac{\partial LogL}{\partial b}=0\Rightarrow\hat{b}=\bar{x_{i}}-\bar{x}_{i-1}a$,
+hvor eksempelvis $\bar{x}_{i-1}$ er gennemsnittet af observationerne
+i=0...n-1. Indsættes det krav i \cref{dLda}, fås nu $\frac{\partial LogL}{\partial a}=0\Rightarrow\sum_{i=1}^{n}\left(x_{i}x_{i-1}-x_{i-1}^{2}\hat{a}-x_{i-1}\bar{x_{i}}-x_{i-1}\bar{x}_{i-1}\hat{a}\right)=0\Leftrightarrow\hat{a}=\frac{\sum_{i=1}^{n}x_{i}x_{i-1}-\bar{x_{i}}x_{i-1}}{\sum_{i=1}^{n}x_{i-1}^{2}-\bar{x}_{i-1}x_{i}}\Rightarrow\hat{b}=\sum_{i=1}^{n}\left(x_{i}-x_{i-1}\hat{a}\right)$.
+Og sidst, må det gælde $\frac{\partial LogL}{\partial v}=0\Leftrightarrow\hat{v}=\sum_{i=1}^{n}\frac{\left(x_{i}-x_{i-1}\hat{a}-\hat{b}\right)^{2}}{n}$.
+Under hensyn til uoverskueliggørende indsættelser er de lukkede Maksimum
+Likelihood Estimater dermed givet ved (såfremt disse rent faktisk
+maksimerer, hvad der vil være klart i næste afsnit); 
+\begin{align}
+\begin{pmatrix}\hat{a}\\
+\hat{b}\\
+\hat{v}
+\end{pmatrix}=\begin{pmatrix}\frac{\sum_{i=1}^{n}x_{i}x_{i-1}-\bar{x_{i}}x_{i-1}}{\sum_{i=1}^{n}x_{i-1}^{2}-\bar{x}_{i-1}x_{i}}\\
+\sum_{i=1}^{n}\left(x_{i}-x_{i-1}\hat{a}\right)\\
+\ \sum_{i=1}^{n}\frac{\left(x_{i}-x_{i-1}\hat{a}-\hat{b}\right)^{2}}{n}
+\end{pmatrix}\Leftrightarrow\begin{pmatrix}\hat{\kappa}\\
+\hat{\theta}\\
+\hat{\sigma}
+\end{pmatrix}=\begin{pmatrix}\frac{-\log\left(\hat{a}\right)}{\Delta t}\\
+\frac{\hat{b}}{1-\hat{a}}\\
+\sqrt{-\frac{2\log(\hat{a})\hat{v}}{\Delta t\left(1-\hat{a}^{2}\right)}}
+\end{pmatrix}
+\end{align}
+
+
+\section{Pricing and hedging in the Black-Scholes model}
+
+\subsection{Bevis for Et meget hjælpsomt resultat}
+
+Den mest centrale model for kontinuert-tids finansiering, Black-Scholes
+modellen, har en aktiekurs, der følger geometrisk brownsk bevægelse.
+Mere præcist, udvikler den sig ved følgende differentialligning, 
+\begin{equation}
+dX_{t}=\beta X_{t}dt+\xi X_{t}dW_{t}\label{dXt}
+\end{equation}
+med den velkendte løsning, 
+\begin{equation}
+X_{T}=X_{t}\exp\left\{ \left(\beta-\frac{\xi^{2}}{2}\right)(T-t)+\xi(W_{T}-W_{t})\right\} \label{XT}
+\end{equation}
+Betragt nu $Y_{t}=e^{(\beta-\alpha)(T-t)}X_{t}$, der har følgende
+afledte: 
+\begin{align*}
+\frac{\partial y}{\partial t} & =-(\beta-\alpha)e^{(\beta-\alpha)(T-t)}X_{t}\\
+\frac{\partial y}{\partial x} & =e^{(\beta-\alpha)(T-t)}\\
+\frac{\partial^{2}y}{\partial t^{2}} & =0
+\end{align*}
+Hvormed $Y_{t}$ har Itô-differentialet 
+\begin{align*}
+dY_{t} & =\left\{ -(\beta-\alpha)e^{(\beta-\alpha)(T-t)}X_{t}+\beta X_{t}e^{(\beta-\alpha)(T-t)}\right\} dt+\xi e^{(\beta-\alpha)(T-t)}X_{t}dW_{t}\\
+ & =\alpha Y_{t}dt+\xi Y_{t}dW_{t}
+\end{align*}
+$Y_{t}$ er altså selv en geometrisk brownsk bevægelse nu med drift
+$\alpha$. Det kan vi nu udnytte, ved at følge linjerne i \cite{fin1}:NOTE:
+Bør jeg benytte betinget forventning givet Ft? Spørg sofie. 
+\begin{align*}
+e^{-\alpha(T-t)}E[\left(X_{T}-K\right)^{+}|\mathbb{F}_{t}] & =e^{-\alpha(T-t)}E[\left(Y_{T}-K\right)^{+}|\mathbb{F}_{t}]\\
+ & =e^{-\alpha(T-t)}\int_{-\infty}^{\infty}\left(Y_{t}\exp\left\{ \left(\alpha-\frac{\xi^{2}}{2}\right)(T-t)+y\right\} -K\right)^{+}\phi_{\xi^{2}(T-t)}(y)dy
+\end{align*}
+Hvor "law of the unconcious statistician" blev brugt i sidste lighedstegn,
+og $\phi_{\xi^{2}(T-t)}(y)$ er tætheden for en $\mathcal{N}\left(0,\xi^{2}(T-t)\right)$-fordeling.
+Integranden er forskellig fra 0 når 
+\begin{align*}
+Y_{t}\exp\left\{ \left(\alpha-\frac{\xi^{2}}{2}\right)(T-t)+y\right\} >K\Leftrightarrow y>d:=\ln\left(\frac{K}{Y_{t}}\right)-\left(\alpha-\frac{\xi^{2}}{2}\right)(T-t)\Rightarrow
+\end{align*}
+\begin{align}
+e^{-\alpha(T-t)}E[\left(X_{T}-K\right)^{+}|\mathbb{F}{}_{t}] & =e^{-\alpha(T-t)}\int_{d}^{\infty}Y_{t}e^{\left(\alpha-\frac{\xi^{2}}{2}\right)(T-t)+y}\frac{1}{\sqrt{2\pi\xi^{2}(T-t)}}e^{\frac{-y^{2}}{2\xi^{2}(T-t)}}dy\label{A1}\\
+ & -e^{-\alpha(T-t)}\int_{d}^{\infty}K\frac{1}{\sqrt{2\pi\xi^{2}(T-t)}}e^{\frac{-y^{2}}{2\xi^{2}(T-t)}}dy\label{A2}
+\end{align}
+Lad $Z\sim\mathcal{N}(0,1)$, da er (\ref{A2})-leddet givet ved $-e^{-\alpha(T-t)}KP(\xi\sqrt{T-t}Z>d)=-e^{-\alpha(T-t)}K\Phi(-\frac{d}{\xi\sqrt{T-t}})$
+(hvor $\Phi$ angiver fordelingsfunktionen for en $\mathcal{N}(0,1)$-fordeling),
+per normalfordelingens symmetri. Lad $d_{2}$ være givet som $-\frac{d}{\xi\sqrt{T-t}}=\frac{\ln\left(\frac{Y_{t}}{K}\right)+\left(\alpha-\frac{\xi^{2}}{2}\right)(T-t)}{\xi\sqrt{T-t}}$.
+Vendes blikket mod (\ref{A1})-leddet, ses det at det er givet som
+\begin{align*}
+(\ref{A1}) & =Y_{t}\int_{d}^{\infty}\exp\left\{ \left(-\frac{\xi^{2}}{2}\right)(T-t)+y\right\} \frac{1}{\sqrt{2\pi\xi^{2}(T-t)}}\exp\left\{ \frac{-y^{2}}{2\xi^{2}(T-t)}\right\} dy\\
+ & \overset{(1)}{=}Y_{t}\exp\left\{ \left(-\frac{\xi^{2}}{2}\right)(T-t)\right\} \int_{\frac{d}{\xi\sqrt{T-t}}}^{\infty}\frac{1}{\sqrt{2\pi}}\exp\left\{ z\xi\sqrt{T-t}-\frac{z^{2}}{2}\right\} dz\\
+ & \overset{(2)}{=}Y_{t}\exp\left\{ \left(-\frac{\xi^{2}}{2}\right)(T-t)\right\} \int_{\frac{d}{\xi\sqrt{T-t}}}^{\infty}\frac{1}{\sqrt{2\pi}}\exp\left\{ \frac{-\left(z-\xi\sqrt{T-t}\right)^{2}}{2}+\frac{\xi^{2}}{2}(T-t)\right\} dz\\
+ & =Y_{t}P\left(Z+\xi\sqrt{T-t}>\frac{d}{\xi\sqrt{T-t}}\right)\\
+ & \overset{(3)}{=}Y_{t}P\left(Z\leq d_{2}+\xi\sqrt{T-t}\right)\\
+ & =Y_{t}\Phi\left(d_{1}\right)
+\end{align*}
+Hvor der i (1) foretages variabelskiftet $z=\frac{y}{\xi\sqrt{T-t}}$,
+i (2) bruges kvadratsætningerne, og i (3) er brugt normalfordelingens
+symmetri. $d_{1}$ er altså givet som $d_{2}+\xi\sqrt{T-t}=\frac{\ln\left(\frac{Y_{t}}{K}\right)+\left(\alpha+\frac{\xi^{2}}{2}\right)(T-t)}{\xi\sqrt{T-t}}$.
+Alt i alt fås der således: 
+\begin{align}
+e^{-\alpha(T-t)}E[\left(X_{T}-K\right)^{+}|\mathbb{F}_{t}] & =Y_{t}\Phi\left(d_{1}\right)-e^{-\alpha(T-t)}K\Phi(d_{2})\overset{t=0}{\Rightarrow}\\
+e^{-\alpha T}E[\left(X_{T}-K\right)^{+}] & =X_{0}e^{(\beta-\alpha)T}\Phi\left(\frac{\ln\left(\frac{X_{0}e^{(\beta-\alpha)T}}{K}\right)+\left(\alpha+\frac{\xi^{2}}{2}\right)T}{\xi\sqrt{T}}\right)\nonumber \\
+ & -e^{-\alpha T}K\Phi\left(\frac{\ln\left(\frac{X_{0}e^{(\beta-\alpha)T}}{K}\right)+\left(\alpha-\frac{\xi^{2}}{2}\right)T}{\xi\sqrt{T}}\right)\nonumber \\
+ & =X_{0}e^{(\beta-\alpha)T}\Phi\left(\frac{\ln\left(\frac{X_{0}}{K}\right)+\left(\beta+\frac{\xi^{2}}{2}\right)T}{\xi\sqrt{T}}\right)\\
+ & -e^{-\alpha T}K\Phi\left(\frac{\ln\left(\frac{X_{0}}{K}\right)+\left(\beta-\frac{\xi^{2}}{2}\right)T}{\xi\sqrt{T}}\right)\nonumber 
+\end{align}
+
+
+\subsection{Call-delta}
+
+Per \cite{bjork}, prop 7.13, er call prisen for et marked med P-dynamikker
+\begin{align}
+dB_{t} & =rB_{t}dt\label{dbt}\\
+dS_{t} & =\mu S_{t}dt+\sigma S_{t}dt\label{dst}
+\end{align}
+hvor \cref{dbt} angiver rentedynamikken, og \cref{dst} angiver
+aktiens dynamik, givet ved formlen: 
+\begin{align}
+F(t,s,K) & =s\Phi(d_{1}(t,s,K))-e^{-r(T-t)}K\Phi(d_{2}(t,s,K)),\label{callpris}\\
+d_{1} & =\frac{\ln\left(\frac{s}{K}\right)+\left(r+\frac{\sigma^{2}}{2}\right)(T-t)}{\sigma\sqrt{T-t}}\nonumber \\
+d_{2} & =\frac{\ln\left(\frac{s}{K}\right)+\left(r-\frac{\sigma^{2}}{2}\right)(T-t)}{\sigma\sqrt{T-t}}\nonumber 
+\end{align}
+For at undersøge hvorledes denne pris ændrer sig ved ændringer i aktieprisen,
+kan \cref{callpris} differentieres. Bemærk her at $d_{1}=d_{2}+\sigma\sqrt{T-t}\Rightarrow\frac{\partial d_{1}}{\partial s}=\frac{\partial d_{2}}{\partial s}$.
+\begin{align}
+\frac{\partial F}{\partial s} & =\Phi(d_{1})+s\phi(d_{1})\frac{\partial d_{1}}{\partial s}-e^{r(T-t)}K\phi(d_{2})\frac{\partial d_{2}}{\partial s}\nonumber \\
+ & =\Phi(d_{1})+\frac{\partial d_{1}}{\partial s}\frac{1}{\sqrt{2\pi}}\exp\left\{ \ln(s)-\frac{\left(\ln\left(\frac{s}{K}\right)+\left(r+\frac{\sigma^{2}}{2}\right)(T-t)\right)^{2}}{2\sigma^{2}(T-t)}\right\} \label{dfds}\\
+ & -\frac{\partial d_{1}}{\partial s}\frac{1}{\sqrt{2\pi}}\exp\left\{ \ln(K)-r(T-t)-\frac{\left(\ln\left(\frac{s}{K}\right)+\left(r-\frac{\sigma^{2}}{2}\right)(T-t)\right)^{2}}{2\sigma^{2}(T-t)}\right\} \nonumber 
+\end{align}
+Fokuseres på andet led, ses følgende: 
+\begin{align*}
+ & \exp\left\{ \ln(s)+\ln(K)-r(T-t)-\ln(K)+r(T-t)-\frac{\left(\ln\left(\frac{s}{K}\right)+\left(r-\frac{\sigma^{2}}{2}\right)(T-t)\right)^{2}}{2\sigma^{2}(T-t)}\right\} \\
+ & =\exp\left\{ \ln(K)-r(T-t)+\frac{2\sigma^{2}(T-t)\ln(\frac{s}{K})+r(T-t)^{2}2\sigma^{2}}{2\sigma^{2}(T-t)}\right.\\
+ & -\left.\left(\frac{\ln(\frac{s}{K})^{2}+(r+\frac{\sigma^{2}}{2})^{2}(T-t)^{2}+2\ln(\frac{s}{K})(r+\frac{\sigma^{2}}{2})(T-t)}{2\sigma^{2}(T-t)}\right)\right\} \\
+ & =\exp\left\{ \ln(K)-r(T-t)-\frac{\ln(\frac{s}{K})^{2}+(r-\frac{\sigma^{2}}{2})^{2}(T-t)^{2}+2\ln(\frac{s}{K})(r-\frac{\sigma^{2}}{2})(T-t)}{2\sigma^{2}(T-t)}\right\} 
+\end{align*}
+Hvormed det ses at andelt led er lig tredje i \cref{dfds}, så $\dfdx{F}{s}=\Phi(d_{1})$. 
+
+\printbibliography
+ 
+\end{document}

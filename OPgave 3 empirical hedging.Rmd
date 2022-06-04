@@ -44,7 +44,7 @@ library(moments)
 theme_set(theme_bw())
 set.seed(442)
 
-Vix <- read_csv("C:\\Users\\Frederik Christensen\\OneDrive\\UNI\\Mat-oek-tiden\\6Semester\\Vix.csv")
+Vix <- read_csv("C:\\Users\\Frederik Christensen\\OneDrive\\UNI\\Mat-oek-tiden\\6Semester\\FinKont0BA\\Vix.csv")
 
 
 Vix <- Vix %>% 

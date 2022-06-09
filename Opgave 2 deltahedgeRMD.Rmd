@@ -19,7 +19,7 @@ r <- 0.02
 default_drift<-      0.02
 drift <- c(-100:100/1000)
 vol<-0.2
-vol_hedge <- c(2:300/1000)
+vol_hedge <- c(100:300/1000)
 default_vol_hedge<-0.2
 cT<-1
 K<-102
@@ -161,9 +161,10 @@ timetomatplt <- ggplot() + xlim(50,200) + geom_function(size=1, n=1000, aes(colo
 
 volVpfPlt <- ggplot() + xlim(0.1,0.3) + geom_function(size=1, n=1000, aes(color = "Call"), fun = function(x) (BlackScholesFormula(spot=testspot, timetomat = 0.2, strike = 102, r = r, sigma = x, opttype=1, greektype = 1)/BlackScholesFormula(spot=testspot, timetomat = 0.2, strike = 102, r = r, sigma = 0.2, opttype=1, greektype = 1))) +
   geom_function(size=1, n=1000,aes(color = "Digital"), fun = function(x) BlackScholesFormula(spot=testspot, timetomat = 0.2, strike = 102, r = r, sigma = x, opttype=2, greektype = 1)/BlackScholesFormula(spot=testspot, timetomat = 0.2, strike = 102, r = r, sigma = 0.2, opttype=2, greektype = 1)) + 
-  labs(x="Volatilitet", y="Værdi af option",caption = "") + scale_color_discrete(name="Optionstype")
+  labs(x="Volatilitet", y="Værdi af option") + scale_color_discrete(name="Optionstype")
 
 volVpfPlt
+ggsave("volVpfPlt.png", device = "png")
 timetomatplt
 
 
@@ -238,7 +239,7 @@ rdata <- tibble("Drift" =  driftdata[,1], "HedgeerrorsCall" = driftdata[,2],"Hed
   pivot_longer(cols = "HedgeerrorsCall":"HedgeerrorsDigi", names_to = "Optiontype", names_prefix = "Hedgerrors", values_to = "Hedgeerror")
 
 ggplot(data = rdata, aes(x=Drift, y=Hedgeerror, colour = Optiontype)) + geom_point() + 
-  labs(x="Aktiens drift", y= "Afvigelse fra optionspayoff, pct.", colour = "Optionstype")+
+  labs(x="Aktiens drift", y= "Afvigelse fra optionspayoff, pct.", colour = "Optionstype", caption = "Sort stiplet linje angiver aktiens sande drift.")+ geom_vline(xintercept = 0.02, linetype = "dashed") +
   scale_colour_discrete(name="Optionstype", labels=c("Call", "Digital"))
 ggsave("rIkkeLigMu.png",device="png")
 
@@ -246,8 +247,8 @@ voldata <- tibble("Vol_hedge" =  vols[,1], "HedgeerrorsCall" = vols[,2],"Hedgeer
   pivot_longer(cols = "HedgeerrorsCall":"HedgeerrorsDigi", names_to = "Optiontype", names_prefix = "Hedgerrors", values_to = "Hedgeerror")
 
 ggplot(data = voldata, aes(x=Vol_hedge)) + geom_point(aes(y=Hedgeerror, color = Optiontype)) +
-  labs(x="Antaget volatilitet i hedgestrategi", y= "Afvigelse fra optionspayoff, pct.", colour = "Optionstype") +
-  scale_colour_discrete(name="Optionstype", labels=c("Call", "Digital"))
+  labs(x="Antaget volatilitet i hedgestrategi", y= "Afvigelse fra optionspayoff, pct.", colour = "Optionstype", caption = "Sort stiplet linje angiver aktiens sande volatilitet.") +
+  scale_colour_discrete(name="Optionstype", labels=c("Call", "Digital")) + geom_vline(xintercept =0.2, linetype="dashed")
 ggsave("volHedge.png",device="png")
 
 
@@ -255,7 +256,7 @@ hedgedata <- tibble("NumHedgepoints" =  nhedges[,1], "SDHedgeerrorsCall" = nhedg
   pivot_longer(cols = "SDHedgeerrorsCall":"SDHedgeerrorsDigi", names_to = "Optiontype", names_prefix = "SDHedgerrors", values_to = "SDHedgeerror")
 
 ggplot(data = hedgedata, aes(x=log(NumHedgepoints))) + geom_point(aes(y=log(SDHedgeerror), color = Optiontype)) +
-  labs(x="Log(antal hedgingpunkter)", y= "Log(SD. afv. på absolut hedgefejl)", colour = "Optionstype") + 
-  scale_colour_discrete(name="Optionstype", labels=c("Call", "Digital"))
+  labs(x="Log(antal hedgingpunkter)", y= "Log(SD. afv. på absolut hedgefejl)", colour = "Optionstype", caption = "Den hele linje har en hældning på -1/2, den stiplede en hældning på -1/4") + 
+  scale_colour_discrete(name="Optionstype", labels=c("Call", "Digital")) + geom_abline(slope = -1/2, intercept = 2)+ geom_abline(slope = -1/4, intercept = -1, linetype = "dashed")
 ggsave("nHedge.png",device="png")
 ```

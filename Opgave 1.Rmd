@@ -17,7 +17,7 @@ theme_set(theme_bw())
 
 ```{r variables}
 set.seed(442)
-savegraph = FALSE
+savegraph = TRUE
 Mreps <- 10000
 kappa <- 0.5
 theta <- 0.05
@@ -191,19 +191,19 @@ kaplt <- ggplot(paramDF, aes(x=kappahats)) +
   geom_histogram(aes(x=kappahats,y=..density..), bins=50) + xlim(-5,30) +
   geom_vline(xintercept = kappa, color="red") + 
   geom_vline(xintercept = kappahat, color="black", linetype="dashed") +
-  labs(y="Tæthed", x="Kappa est.")+
+  labs(y="Tæthed", x="Kappa est.", caption = "")+
   stat_function(fun=dnorm, args = list(mean=kappahat, sd=sqrt(inversefisher[1,1])))
 thplt <- ggplot(paramDF, aes(x=thetahats)) + 
   scale_x_continuous(labels=scalefunth, limits = c(-0.05,0.1)) +
   geom_histogram(aes(x=thetahats,y = ..density..), bins=50) + 
   geom_vline(xintercept = theta, color="red") +
   geom_vline(xintercept = thetahat, color="black", linetype="dashed") + 
-  labs(y="Tæthed", x="Theta est.")+
+  labs(y="Tæthed", x="Theta est.", caption = "")+
   stat_function(fun=dnorm, args = list(mean=thetahat, sd=sqrt(inversefisher[2,2])))
 shplt <- ggplot(paramDF, aes(x=sigmahats)) + 
   geom_histogram(aes(x=sigmahats, y=..density..), bins=50)  +
   scale_x_continuous(labels=scalefun, limits = c(0.015,0.025)) +
-  labs(y="Tæthed", x="Sigma est.")+
+  labs(y="Tæthed", x="Sigma est.", caption = "Note: Stiplet sort angiver det gennemsnitlige MLE-estimat, mens solid rød angiver den sande parameterværdi.")+
   geom_vline(xintercept = sigma, color="red") + 
   geom_vline(xintercept = sigmahat, color="black", linetype="dashed") + 
   stat_function(fun=dnorm, args = list(mean=sigmahat, sd=sqrt(inversefisher[3,3])))
@@ -211,9 +211,6 @@ ggarrange(kaplt, thplt, shplt,labels = c("A","B","C"), ncol=3)
 if (savegraph){ggsave(paste("Opg1SimT",T,".png"),device="png")}
 
 ```
-```{r VIX}
 
-
-```
 
 

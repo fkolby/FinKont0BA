@@ -118,7 +118,7 @@ VixRes <- VixCompare %>%
 g1 <- ggplot(VixCompare, aes(sample=CloseNorm))  + stat_qq() + geom_abline(slope=1, intercept=0,color="red") +
   ggtitle("QQ-plot for VIX") + xlim(-4,4) + ylim(-10,16) + labs(x="Teoretiske fraktiler", y="Fraktiler for VIX")
 g2 <- ggplot(VixCompare, aes(sample=LogCloseNorm))  + stat_qq() + geom_abline(slope=1, intercept=0,color="red") + 
-  ggtitle("QQ-plot for log(VIX)") + xlim(-4,4) + ylim(-10,16) + labs(x="Teoretiske fraktiler", y="Fraktiler for log(VIX)")
+  ggtitle("QQ-plot for log(VIX)") + xlim(-4,4) + ylim(-10,16) + labs(x="Teoretiske fraktiler", y="Fraktiler for log(VIX)",caption ="Note: Rød linje angiver y=x.")
 g1 + g2
 ggsave("QQplotVix.png", device="png")
 

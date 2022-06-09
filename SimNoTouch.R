@@ -5,7 +5,7 @@ S0<-100
 
 
 sigma<-0.2
-sigma_hedge<-0.2
+
 (r<-sigma^2/2)
 mu<-r
 
@@ -29,7 +29,6 @@ for(i in 2:Nhedge){
     VpfNoTouch <- VpfNoTouch*(St<strike)
 }
 
-VpfNoTouch <- VpfNoTouch*(St<strike)
 
 
 
